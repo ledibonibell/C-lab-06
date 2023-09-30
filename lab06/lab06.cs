@@ -1,10 +1,11 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 
 class lab06
 {
     static async Task Main(string[] args)
     {
-        for (int j = 0; j < 10; j++) {
+        for (int j = 0; j < 10; j++)
+        {
             Console.WriteLine();
 
             string apiKey = "78a42a81f9fcfc14fa64cee749e70b59";
@@ -19,33 +20,19 @@ class lab06
                 double latitude = random.NextDouble() * (90 - (-90)) + (-90);
                 double longitude = random.NextDouble() * (180 - (-180)) + (-180);
 
-                using (HttpClient client = new HttpClient())
+                Weather weather = await GetWeatherData(apiUrl, apiKey, latitude, longitude);
+                if (weather != null)
                 {
-                    var response = await client.GetStringAsync($"{apiUrl}?lat={latitude}&lon={longitude}&appid={apiKey}&units=metric");
-                    var weatherInfo = JsonSerializer.Deserialize<WeatherInfo>(response);
-
-                    if (weatherInfo != null)
-                    {
-                        string country = weatherInfo.sys.country;
-                        string name = weatherInfo.name;
-                        double temp = weatherInfo.main.temp;
-                        string description = weatherInfo.weather[0].description;
-
-                        weatherData.Add(new Weather
-                        {
-                            Country = country,
-                            Name = name,
-                            Temp = temp,
-                            Description = description
-                        });
-                    }
+                    weatherData.Add(weather);
                 }
             }
-        
+
             var maxTempCountry = weatherData.OrderByDescending(w => w.Temp).FirstOrDefault();
             var minTempCountry = weatherData.OrderBy(w => w.Temp).FirstOrDefault();
             var averageTemp = weatherData.Average(w => w.Temp);
             var distinctCountriesCount = weatherData.Select(w => w.Country).Distinct().Count();
+
+            var allCountries = weatherData.Select(w => w.Country).Distinct().ToList();
 
             var firstClearSky = weatherData.FirstOrDefault(w => w.Description == "clear sky");
             var firstRain = weatherData.FirstOrDefault(w => w.Description == "rain");
@@ -69,7 +56,7 @@ class lab06
             {
                 Console.WriteLine($"Первая страна с дождем: {firstRain.Country}, Местность: {firstRain.Name}");
             }
-            else 
+            else
             {
                 Console.WriteLine("Стран с дождем нет");
             }
@@ -82,11 +69,52 @@ class lab06
             {
                 Console.WriteLine("Стран с облаками нет");
             }
+
+            Console.WriteLine("\nВсе страны:");
+            foreach (var country in allCountries)
+            {
+                Console.WriteLine(country);
+            }
+        }
+    }
+
+    static async Task<Weather> GetWeatherData(string apiUrl, string apiKey, double latitude, double longitude)
+    {
+        using (HttpClient client = new HttpClient())
+        {
+            int maxAttempts = 10;
+            int attempt = 0;
+
+            while (attempt < maxAttempts)
+            {
+                var response = await client.GetStringAsync($"{apiUrl}?lat={latitude}&lon={longitude}&appid={apiKey}&units=metric");
+                var weatherInfo = JsonSerializer.Deserialize<WeatherInfo>(response);
+
+                if (weatherInfo != null && !string.IsNullOrEmpty(weatherInfo.sys.country))
+                {
+                    string country = weatherInfo.sys.country;
+                    string name = weatherInfo.name;
+                    double temp = weatherInfo.main.temp;
+                    string description = weatherInfo.weather[0].description;
+
+                    return new Weather
+                    {
+                        Country = country,
+                        Name = name,
+                        Temp = temp,
+                        Description = description
+                    };
+                }
+
+                attempt++;
+            }
+
+            return null;
         }
     }
 }
 
-class WeatherInfo
+    class WeatherInfo
 {
     public MainInfo main { get; set; }
     public WeatherDescription[] weather { get; set; }
